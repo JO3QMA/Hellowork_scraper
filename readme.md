@@ -20,7 +20,7 @@ Convert the information on the job page of HelloWork Internet Service to a CSV f
 ## Install
 ``` 
 git clone
-cd hellowork_scraper
+cd Hellowork_scraper
 bundle install
 ```
 
