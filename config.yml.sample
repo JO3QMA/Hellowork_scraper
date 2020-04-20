@@ -22,7 +22,7 @@ param_const:
 param_list:
   # 求職番号
   # 半角数字 5桁+8桁以内
-  kSnoJo: ""
+  kSNoJo: ""
   kSNoGe: ""
   
   # 基本検索条件
