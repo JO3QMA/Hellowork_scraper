@@ -92,6 +92,7 @@ class SearchPage
         @index_max_num = (@index_num / @display_count_to_page.to_f).ceil # 最大ページ数を計算。
         puts "検索結果: #{@index_num}件"
         puts "検索ページ数: #{@index_max_num}ページ"
+        @index_num
     end
 
     def make_seach_url_array
@@ -123,13 +124,13 @@ end
 
 # 求人情報画面全般の処理
 class JobPage
-    def initialize(cookie)
+    def initialize(cookie, max_count)
         @csv_hash = []
-        @title_line = eval File.read 'job_info.rb'
-        @csv_hash[0] = @title_line
+        @csv_hash[0] = eval File.read 'job_info.rb'
         @csv_array = []
         @sleep_time = 3
         @cookie = cookie
+        @max_count = max_count
     end
 
     def string_scraper(url)
@@ -143,21 +144,25 @@ class JobPage
     end
 
     def page_accesser(list)
+        puts '求人ページのから情報を取得しています…'
         hash_index = 1
         list.each do |url|
             @csv_hash[hash_index] = string_scraper(url)
             hash_index += 1
+            progress(hash_index)
             sleep @sleep_time
         end
     end
 
     def generate_csv
+        puts 'CSVに変換しています...'
         array_index = 0
         @csv_hash.map do |value|
             value = value.values
             @csv_array[array_index] = value
             array_index += 1
         end
+        puts 'CSVへの変換が完了しました。'
     end
 
     def save_csv(filename = 'output.csv')
@@ -166,17 +171,28 @@ class JobPage
                 csv << bo
             end
         end
+        puts "#{filename} に保存されました。"
+    end
+
+    def progress(count)
+        count -= 1
+        percent = count / @max_count.to_f * 100
+        scale = 2
+        bar = percent / scale
+        hide_bar = 100 / scale - bar.floor
+        print "\r#{count}件目 [#{'=' * bar}#{' ' * hide_bar}] #{percent.floor(1)}%完了"
+        puts '' if count == @max_count
     end
 end
 
 main = SearchPage.new
 result_url = main.url_generator
 cookie = main.get_cookie(result_url)
-main.parse_result_num(result_url)
+result_num = main.parse_result_num(result_url)
 main.make_seach_url_array
 url_list = main.parse_result_url
 
-main = JobPage.new(cookie)
+main = JobPage.new(cookie, result_num)
 main.page_accesser(url_list)
 main.generate_csv
 main.save_csv
