@@ -144,7 +144,7 @@ class JobPage
     end
 
     def page_accesser(list)
-        puts '求人ページのから情報を取得しています…'
+        puts '求人ページから情報を取得しています…'
         hash_index = 1
         list.each do |url|
             @csv_hash[hash_index] = string_scraper(url)
