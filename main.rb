@@ -16,8 +16,8 @@ class SearchPage
         @job_offer_url_list = [] # 求人情報詳細画面のURLリスト
         @display_count_to_page = 10
         @config = YAML.load_file(config_path)
-        @param_const = @config['param_const'] # ユーザーで変更できる部分のパラメータ類
-        @param_list  = @config['param_list']  # 定数またはシステムで変更されるパラメータ類
+        @param_const = @config['param_const'] # 定数やシステムによって変更されるパラメーター類
+        @param_list  = @config['param_list']  # 検索条件
         @param_list2 = @config['param_list2'] # 詳細検索条件
     end
 
