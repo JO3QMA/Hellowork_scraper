@@ -1,165 +1,182 @@
+# frozen_string_literal: true
+
 require 'net/http'
 require 'nokogiri'
 require 'open-uri'
 require 'csv'
 require 'yaml'
 
-$access_page = 'https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do' # 求人情報検索画面のURL
-$job_offer_page_dir = 'https://www.hellowork.mhlw.go.jp/kensaku/'
-sleep_time = 3 # LibraHack対策
-param_list = Hash.new # ユーザーで変更できる部分のパラメータ類
-param_const = Hash.new # 定数またはシステムで変更されるパラメータ類
-param_list2 = Hash.new # 詳細検索条件
-job_offer_url_list = Array.new # 求人情報詳細画面のURLリスト
-display_count_to_page = 10
-cookie_option = ''
-
-config = YAML.load_file("./config.yml")
-
-param_const = config["param_const"]
-param_list = config["param_list"]
-param_list2 = config["param_list2"]
-
-def create_url_parm(val_name, parm)
-    if parm.instance_of?(Array)
-        # Array型ならば
-        if parm.empty?
-            @output_parm = ''
-        else
-            # Arrayの数だけparamを連結する
-            @connected_parm = ''
-            parm.each{|var|
-                var = var.to_s
-                @temp_parm = val_name + '=' + var + '&'
-                @connected_parm += @temp_parm
-            }
-            @output_parm = @connected_parm
-        end
-    elsif parm.instance_of?(String)
-        # String型なら
-        if parm == ''
-            @output_parm = ''
-        else
-            # 連結
-            @output_parm = val_name + '=' + URI.encode_www_form_component(parm) + '&'
-        end
-    elsif parm.integer?
-        # Int型ならば
-        # Stringに変換してから連結
-        parm = parm.to_s
-        @output_parm = val_name + '=' + parm + '&'
-    else
-        # それ以外の型
-        # もうそれはしらん
-        @output_parm = ''
+# 検索画面全般の処理
+class SearchPage
+    def initialize(config_path = './config.yml')
+        puts 'Init...'
+        @access_page = 'https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do'
+        @job_offer_page_dir = 'https://www.hellowork.mhlw.go.jp/kensaku/'
+        @sleep_time = 3 # LibraHack対策
+        @job_offer_url_list = [] # 求人情報詳細画面のURLリスト
+        @display_count_to_page = 10
+        @config = YAML.load_file(config_path)
+        @param_const = @config['param_const'] # ユーザーで変更できる部分のパラメータ類
+        @param_list  = @config['param_list']  # 定数またはシステムで変更されるパラメータ類
+        @param_list2 = @config['param_list2'] # 詳細検索条件
     end
-    return @output_parm
-end
 
-def param_creater(hash)
-    @param = ""
-    hash.each{ |key, value|
-        @param += create_url_parm(key, value)
-    }
-    return @param
-end
-def param2_creater(hash)
-    @param = ""
-    hash.each{ |key, value|
-        @param += create_url_parm(key, value)
-    }
-    return @param
-end
-
-def generate_url(hash,hash2,const)
-    target_page = $access_page + '?' + param_creater(hash) + param_creater(hash2) + param_creater(const).chop!
-    return target_page
-end
-
-def generate_url2(hash,const)
-    target_page = $access_page + '?' + param_creater(hash) + param_creater(const).chop!
-    return target_page
-end
-
-def get_cookie(uri)
-    uri = URI(uri)
-    res = Net::HTTP.get_response(uri)
-    cookie = res['set-Cookie']
- #   puts "Cookie: #{cookie}"
-    return cookie
-end
-
-target_page = generate_url(param_list, param_list2, param_const)
-puts "URL: #{target_page}"
-cookie_option = get_cookie(target_page)
-doc = Nokogiri::HTML.parse(open(target_page))
-
-nodes = doc.css('div.m05 > span.fb')
-index_num = nodes.text.scan(/(\d+)/)[0].join('').to_i
-#puts "検索結果: #{index_num} 件"
-index_max_num = (index_num/display_count_to_page.to_f).ceil
-1.upto(index_max_num){|page_no|
-    param_const["fwListNaviBtnNext"] = "次へ＞"
-    param_const["kyujinkensu"] = index_num
-    param_const["fwListNowPage"] = page_no - 1
-    param_const["fwListNaviCount"] = page_no + 5
-    param_const["searchBtn"] = ""
-    target_page = generate_url2(param_list, param_const)
-    p target_page
-    p page_no
-    doc = Nokogiri::HTML.parse(open(target_page, { 'Cookie' => cookie_option}))
-    doc.css('div.flex a#ID_dispDetailBtn').each do |anchor|
-        page_url = $job_offer_page_dir + anchor[:href].delete_prefix!('./')
-        p page_url
-        job_offer_url_list.push(page_url)
+    def create_url_parm(key, value)
+        case value
+        when Array
+            # Array
+            if value.empty?
+                output_parm = ''
+            else
+                connected_parm = ''
+                value.each  do |var|
+                    connected_parm += key + '=' + var.to_s + '&'
+                end
+                output_parm = connected_parm
+            end
+        when String
+            # String
+            output_parm = if value.empty?
+                              ''
+                          else
+                              key + '=' + URI.encode_www_form_component(value) + '&'
+                          end
+        when Integer
+            # Integer
+            output_parm = key + '=' + value.to_s + '&'
+        when NilClass
+            # NilClass
+            output_parm = ''
+        end
+        output_parm
     end
-    sleep sleep_time
-    #p nodes.text
-}
 
-#p job_offer_url_list
-p "合計:" + job_offer_url_list.count.to_s + "件"
+    def param_creater(hash)
+        param = ''
+        hash.each do |key, value|
+            param += create_url_parm(key, value)
+        end
+        param
+    end
 
+    def url_generator(mode = 1)
+        # 初回の検索画面では詳細検索条件まで指定しないと正しく検索されないが、
+        # 2ページ目以降は詳細検索条件を指定すると正しく検索されなくなる。
+        # 初回を1,2ページ目以降を2とし、詳細検索条件の有無を切り替える。
+        case mode
+        when 1
+            url = @access_page + '?' + param_creater(@param_const) + param_creater(@param_list) + param_creater(@param_list2).chop!
+            puts "検索結果URL: #{url}"
+        when 2
+            url = @access_page + '?' + param_creater(@param_const) + param_creater(@param_list).chop!
+        end
+        url
+    end
 
-csv_hash = Array.new
-array_index = 1
+    def get_cookie(url)
+        # 初回の検索時にクッキーが発行され、それを使うことで詳細検索条件を指定せずとも
+        # 2ページ目以降の検索結果を表示することが出来る。
+        # 未調査: 一般に公開していない求人情報の表示にも必要？
+        res = Net::HTTP.get_response(URI(url))
+        sleep @sleep_time
+        @cookie = res['set-Cookie']
+        puts "Cookie: #{@cookie}"
+        @cookie
+    end
 
-title_line = eval File.read 'job_info.rb'
+    def parse_result_num(url)
+        page = Nokogiri::HTML.parse(open(url))
+        sleep @sleep_time
+        nodes = page.css('div.m05 > span.fb')
+        @index_num = nodes.text.scan(/(\d+)/)[0].join('').to_i # 検索結果の件数を取ってくる。
+        @index_max_num = (@index_num / @display_count_to_page.to_f).ceil # 最大ページ数を計算。
+        puts "検索結果: #{@index_num}件"
+        puts "検索ページ数: #{@index_max_num}ページ"
+    end
 
-csv_hash[0] = title_line
-#pp csv_hash[0]
+    def make_seach_url_array
+        @url_array = []
+        1.upto(@index_max_num) do |page_no|
+            @param_const['fwListNaviBtnNext'] = '次へ＞'
+            @param_const['kyujinkensu'] = @index_num
+            @param_const['fwListNowPage'] = page_no - 1
+            @param_const['fwListNaviCount'] = page_no + 5
+            @param_const['searchBtn'] = ''
+            @url_array.push url_generator(2)
+        end
+        @url_array
+    end
 
-def string_scraper(hash, uri)
-  @doc = Nokogiri::HTML.parse(open(uri))
-  @output = Hash.new
-  hash.each{ |key, value|
-    @value = @doc.css("#" + key).text.gsub(/\r\n|\r|\n|\s|\t/, "")
-    @output[key] = @value
-  }
-  return @output
+    def parse_result_url
+        job_offer_url_list = []
+        @url_array.each do |url|
+            document = Nokogiri::HTML.parse(open(url, 'Cookie' => @cookie))
+            sleep @sleep_time
+            document.css('div.flex a#ID_dispDetailBtn').each do |anchor|
+                page_url = @job_offer_page_dir + anchor[:href].delete_prefix!('./')
+                job_offer_url_list.push(page_url)
+            end
+        end
+        job_offer_url_list
+    end
 end
-#csv_hash[1] = string_scraper(title_line,target_page)
 
-#pp csv_hash
+# 求人情報画面全般の処理
+class JobPage
+    def initialize(cookie)
+        @csv_hash = []
+        @title_line = eval File.read 'job_info.rb'
+        @csv_hash[0] = @title_line
+        @csv_array = []
+        @sleep_time = 3
+        @cookie = cookie
+    end
 
-job_offer_url_list.each do |uri|
-    csv_hash[array_index] = string_scraper(title_line,uri)
-    array_index += 1
-    sleep sleep_time
+    def string_scraper(url)
+        document = Nokogiri::HTML.parse(open(url, 'Cookie' => @cookie))
+        output = {}
+        @csv_hash[0].each_key do |key|
+            value = document.css('#' + key).text.gsub(/\r\n|\r|\n|\s|\t/, '')
+            output[key] = value
+        end
+        output
+    end
+
+    def page_accesser(list)
+        hash_index = 1
+        list.each do |url|
+            @csv_hash[hash_index] = string_scraper(url)
+            hash_index += 1
+            sleep @sleep_time
+        end
+    end
+
+    def generate_csv
+        array_index = 0
+        @csv_hash.map do |value|
+            value = value.values
+            @csv_array[array_index] = value
+            array_index += 1
+        end
+    end
+
+    def save_csv(filename = 'output.csv')
+        CSV.open(filename, 'w') do |csv|
+            @csv_array.each do |bo|
+                csv << bo
+            end
+        end
+    end
 end
 
-csv_array = Array.new
-index = 0
-csv_hash.map{|value|
+main = SearchPage.new
+result_url = main.url_generator
+cookie = main.get_cookie(result_url)
+main.parse_result_num(result_url)
+main.make_seach_url_array
+url_list = main.parse_result_url
 
-    value = value.values
-    csv_array[index] = value
-    index += 1
-
-}
-
-CSV.open('output.csv','w') do |csv| # output to csv file
-    csv_array.each do |bo|
-        csv << bo
-    end        
-end
+main = JobPage.new(cookie)
+main.page_accesser(url_list)
+main.generate_csv
+main.save_csv
