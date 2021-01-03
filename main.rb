@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+
+require 'bundler/setup'
+require 'rubygems'
 require 'net/http'
 require 'nokogiri'
 require 'open-uri'
@@ -85,7 +88,7 @@ class SearchPage
     end
 
     def parse_result_num(url)
-        page = Nokogiri::HTML.parse(open(url))
+        page = Nokogiri::HTML.parse(URI.open(url))
         sleep @sleep_time
         nodes = page.css('div.m05 > span.fb')
         @index_num = nodes.text.scan(/(\d+)/)[0].join('').to_i # 検索結果の件数を取ってくる。
@@ -111,7 +114,7 @@ class SearchPage
     def parse_result_url
         job_offer_url_list = []
         @url_array.each do |url|
-            document = Nokogiri::HTML.parse(open(url, 'Cookie' => @cookie))
+            document = Nokogiri::HTML.parse(URI.open(url, 'Cookie' => @cookie))
             sleep @sleep_time
             document.css('div.flex a#ID_dispDetailBtn').each do |anchor|
                 page_url = @job_offer_page_dir + anchor[:href].delete_prefix!('./')
@@ -134,7 +137,7 @@ class JobPage
     end
 
     def string_scraper(url)
-        document = Nokogiri::HTML.parse(open(url, 'Cookie' => @cookie))
+        document = Nokogiri::HTML.parse(URI.open(url, 'Cookie' => @cookie))
         output = {}
         @csv_hash[0].each_key do |key|
             value = document.css('#' + key).text.gsub(/\r\n|\r|\n|\s|\t/, '')
