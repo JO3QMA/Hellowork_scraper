@@ -9,7 +9,8 @@ Hellowork Scraper is to output the [HelloWork job page](https://www.hellowork.mh
 Convert the information on the job page of HelloWork Internet Service to a CSV file.
 
 ## Requirement
-- Ruby 2.6.x
+- Ruby 3.0.2
+- Bundler
 - [Nokogiri](https://nokogiri.org/)
 
 ## Usage
@@ -18,8 +19,8 @@ Convert the information on the job page of HelloWork Internet Service to a CSV f
 1. `ruby main.rb`
 
 ## Install
-``` 
-git clone
+``` bash
+git clone https://github.com/Jo3QMA/Hellowork_Scraper
 cd Hellowork_scraper
 bundle install
 ```
