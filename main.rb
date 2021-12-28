@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-
 require 'bundler/setup'
 require 'rubygems'
 require 'net/http'
@@ -10,14 +9,14 @@ require 'csv'
 require 'yaml'
 
 # 検索画面全般の処理
-class SearchPage
+class SearchPagedisplay
     def initialize(config_path = './config.yml')
         puts 'Init...'
         @access_page = 'https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do'
         @job_offer_page_dir = 'https://www.hellowork.mhlw.go.jp/kensaku/'
-        @sleep_time = 3 # LibraHack対策
+        @sleep_time = 3 # 岡崎市立中央図書館事件対策
         @job_offer_url_list = [] # 求人情報詳細画面のURLリスト
-        @display_count_to_page = 10
+        @display_count_to_page = 10 
         @config = YAML.load_file(config_path)
         @param_const = @config['param_const'] # 定数やシステムによって変更されるパラメーター類
         @param_list  = @config['param_list']  # 検索条件
@@ -25,6 +24,9 @@ class SearchPage
     end
 
     def create_url_parm(key, value)
+        # config.ymlの検索条件の整形
+        # Array, String, Integer, NilClassの形式をURLパラメータとして整形。
+        # 空白(条件指定なし)は検索条件として省略できるので''を返す。
         case value
         when Array
             # Array
@@ -39,9 +41,11 @@ class SearchPage
             end
         when String
             # String
+            # 
             output_parm = if value.empty?
                               ''
                           else
+                            # ASCII文字以外はURLパラメータとして使えないので、エンコード。
                               key + '=' + URI.encode_www_form_component(value) + '&'
                           end
         when Integer
@@ -55,6 +59,8 @@ class SearchPage
     end
 
     def param_creater(hash)
+        # URLパラメータの作成。
+        # 型判別が思ったより長くなったので隔離。
         param = ''
         hash.each do |key, value|
             param += create_url_parm(key, value)
@@ -80,7 +86,7 @@ class SearchPage
         # 初回の検索時にクッキーが発行され、それを使うことで詳細検索条件を指定せずとも
         # 2ページ目以降の検索結果を表示することが出来る。
         # 未調査: 一般に公開していない求人情報の表示にも必要？
-        res = Net::HTTP.get_response(URI(url))
+        res = Net::HTTP.get_response(URI(displayurl))
         sleep @sleep_time
         @cookie = res['set-Cookie']
         puts "Cookie: #{@cookie}"
@@ -88,6 +94,7 @@ class SearchPage
     end
 
     def parse_result_num(url)
+        # 検索件数を取得する関数。
         page = Nokogiri::HTML.parse(URI.open(url))
         sleep @sleep_time
         nodes = page.css('div.m05 > span.fb')
@@ -99,6 +106,7 @@ class SearchPage
     end
 
     def make_seach_url_array
+        # 検索結果ページのURLを一つの配列にまとめ、後でForでぶん回す
         @url_array = []
         1.upto(@index_max_num) do |page_no|
             @param_const['fwListNaviBtnNext'] = '次へ＞'
@@ -112,6 +120,7 @@ class SearchPage
     end
 
     def parse_result_url
+        # 検索結果ページにアクセスし、その中の求人情報ページのリンクを取得し、別の配列に追加する。
         job_offer_url_list = []
         @url_array.each do |url|
             document = Nokogiri::HTML.parse(URI.open(url, 'Cookie' => @cookie))
@@ -137,6 +146,9 @@ class JobPage
     end
 
     def string_scraper(url)
+        # 求人情報ページの各種情報を取得。
+        # CSVにしたときにトラブらないように、制御文字等を予め削除しおく。
+        # 連想配列で出力
         document = Nokogiri::HTML.parse(URI.open(url, 'Cookie' => @cookie))
         output = {}
         @csv_hash[0].each_key do |key|
@@ -147,6 +159,8 @@ class JobPage
     end
 
     def page_accesser(list)
+        # 求人情報にアクセスする際の親関数。
+        # string_scraperで得た連想配列を配列に追加。
         puts '求人ページから情報を取得しています…'
         hash_index = 1
         list.each do |url|
@@ -158,6 +172,7 @@ class JobPage
     end
 
     def generate_csv
+        # 配列からCSV形式に整形
         puts 'CSVに変換しています...'
         array_index = 0
         @csv_hash.map do |value|
@@ -169,6 +184,7 @@ class JobPage
     end
 
     def save_csv(filename = 'output.csv')
+        # 出力
         CSV.open(filename, 'w') do |csv|
             @csv_array.each do |bo|
                 csv << bo
@@ -178,6 +194,7 @@ class JobPage
     end
 
     def progress(count)
+        # 進捗状況確認用の雑実装プログレスバー
         count -= 1
         percent = count / @max_count.to_f * 100
         scale = 2
