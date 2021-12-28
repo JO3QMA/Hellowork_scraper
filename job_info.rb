@@ -59,6 +59,8 @@
     'ID_shoyoMaeNendKaisu' => '賞与の回数(前年度実績)',
     'ID_shoyoKingaku' => '賞与金額',
     'ID_shgJn1' => '就業時間1',
+    'ID_shgJn2' => '就業時間2',
+    'ID_shgJn3' => '就業時間3',
     'ID_shgJiknTkjk' => '就業時間に関する特記事項',
     'ID_jkgiRodoJn' => '時間外労働時間の有無',
     'ID_thkinJkgiRodoJn' => '月平均時間外労働時間',
